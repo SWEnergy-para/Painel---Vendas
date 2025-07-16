@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Painel do Vendedor - SW Energy</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<link rel="manifest" href="manifest.json" />
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(() => console.log("SW registrado"))
+      .catch(error => console.log("Erro no SW", error));
+  }
+</script>
+
+  <header>
+    <div class="logos">
+      <img src="imagens/logo sw.png" alt="Logo SW Energy" />
+      
+    </div>
+    <div><strong>Painel de Vendas</strong></div>
+  </header>
+
+  <div id="loginArea">
+    <h2>Login do Vendedor</h2>
+    <input type="text" id="usuario" placeholder="Nome do vendedor" autocomplete="username" />
+    <input type="password" id="senha" placeholder="Senha" autocomplete="current-password" />
+    <button onclick="logar()">Entrar</button>
+  </div>
+
+  <div id="painel" style="display:none;">
+    <h2>Bem-vindo, <span id="nomeVendedor"></span></h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Cliente</th>
+          <th>kWh</th>
+          <th>Comissão (R$)</th>
+        </tr>
+      </thead>
+      <tbody id="dadosTabela"></tbody>
+    </table>
+    <button onclick="logout()">Sair</button>
+  </div>
+
+  <script>
+    const API_LOGIN_URL = "https://sheetdb.io/api/v1/i3mmwap91vgg4"; // Substitua pela sua URL real
+    const API_DADOS_URL = "https://sheetdb.io/api/v1/07afbu6glk02u";
+
+    async function logar() {
+      const usuarioInput = document.getElementById("usuario").value.trim().toLowerCase();
+      const senhaInput = document.getElementById("senha").value;
+
+      if (!usuarioInput || !senhaInput) {
+        alert("Por favor, preencha usuário e senha.");
+        return;
+      }
+
+      try {
+        const resLogin = await fetch(API_LOGIN_URL);
+        const usuarios = await resLogin.json();
+        const listaUsuarios = usuarios.data || usuarios;
+
+        const user = listaUsuarios.find(u => u.usuario && u.usuario.toLowerCase() === usuarioInput);
+
+        if (!user) {
+          alert("Usuário não encontrado.");
+          return;
+        }
+
+        if (user.senha !== senhaInput) {
+          alert("Senha incorreta.");
+          return;
+        }
+
+        document.getElementById("loginArea").style.display = "none";
+        document.getElementById("painel").style.display = "block";
+        document.getElementById("nomeVendedor").innerText = usuarioInput.charAt(0).toUpperCase() + usuarioInput.slice(1);
+
+        carregarDadosVendedor(usuarioInput);
+
+      } catch (error) {
+        alert("Erro ao acessar dados de login.");
+        console.error(error);
+      }
+    }
+
+    async function carregarDadosVendedor(usuario) {
+      try {
+        const resDados = await fetch(API_DADOS_URL);
+        const dados = await resDados.json();
+        const listaDados = dados.data || dados;
+
+        const tabela = document.getElementById("dadosTabela");
+        tabela.innerHTML = "";
+
+        const registros = listaDados.filter(row => row.vendedor && row.vendedor.toLowerCase() === usuario);
+
+        if (registros.length === 0) {
+          tabela.innerHTML = "<tr><td colspan='4'>Nenhum registro encontrado.</td></tr>";
+          return;
+        }
+
+        registros.forEach(row => {
+          const data = row.data || '-';
+          const cliente = row.cliente || '-';
+          const kwh = row.kwh || '-';
+          let valorComissao = 0;
+
+          if (row.comissao_reais) {
+            const valorNumerico = parseFloat(row.comissao_reais.replace(",", "."));
+            if (!isNaN(valorNumerico)) {
+              valorComissao = valorNumerico;
+            }
+          }
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${data}</td>
+            <td>${cliente}</td>
+            <td>${kwh}</td>
+            <td>${valorComissao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+          `;
+          tabela.appendChild(tr);
+        });
+
+      } catch (error) {
+        alert("Erro ao carregar dados das vendas.");
+        console.error(error);
+      }
+    }
+
+    function logout() {
+      document.getElementById("loginArea").style.display = "block";
+      document.getElementById("painel").style.display = "none";
+      document.getElementById("usuario").value = "";
+      document.getElementById("senha").value = "";
+      document.getElementById("dadosTabela").innerHTML = "";
+    }
+  </script>
+
+</body>
+</html>
